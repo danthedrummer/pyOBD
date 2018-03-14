@@ -11,15 +11,20 @@ from obd_utils import scan_serial
 from datetime import datetime
 
 
-"""
-This class will handle gathering sensor data from the vehicle
-and post this data to the specified url 
-"""
 class headless_reporter():
-    def __init__(self, url, requested_sensors):
+    """
+    This class will handle gathering sensor data from the vehicle
+    and post this data to the specified url 
+    
+    @param requested_sensors: a list of sensors to be polled
+    @param url: the url to receive the data
+    @param additional_params: a dictionary of extra parameters that may be required
+    """
+    def __init__(self, requested_sensors, url, additional_params={}):
         self.port = None
         self.sensor_list = []
         self.url = url
+        self.additional_params = additional_params
         
         for sensor in requested_sensors:
             if sensor != "unknown":
@@ -66,9 +71,20 @@ class headless_reporter():
             self.publish_data(readings)
             
     def publish_data(self, readings):
-        r = requests.post(self.url, data=readings)
-        print("Content ~> " + str(json.loads(r.content)))
-        print("Status ~> " + str(r.status_code))
+        # I'm disabling the post requests until I have an endpoint to use,
+        # I will instead just be using print statements to see what's happening
+        data = self.additional_params
+        for key in readings:
+            data[key] = readings[key]
+            
+        print("Publishing Data")
+        print("Url ~> " + str(self.url))
+        print("Data ~> " + str(data))
+        
+        #TODO: re-enable this code
+        # r = requests.post(self.url, data=readings)
+        # print("Content ~> " + str(json.loads(r.content)))
+        # print("Status ~> " + str(r.status_code))
         
 requested_sensors = ["rpm", "speed", "throttle_pos", "load", "fuel_status"]
 reporter = headless_reporter("https://vehilytics-proto-v2.herokuapp.com/readings", requested_sensors)
