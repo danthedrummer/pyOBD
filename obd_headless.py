@@ -22,7 +22,8 @@ class headless_reporter():
         self.url = url
         
         for sensor in requested_sensors:
-            self.add_sensor(sensor)
+            if sensor != "unknown":
+                self.add_sensor(sensor)
         
     def connect(self):
         portnames = scan_serial() #TODO: Add in the obd_utils 
