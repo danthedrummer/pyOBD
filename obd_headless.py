@@ -79,14 +79,23 @@ class headless_reporter():
             
         print("Publishing Data")
         print("Url ~> " + str(self.url))
-        print("Data ~> " + str(data))
+        print("Readings ~> " + str(readings))
+        
+        # TODO: Remove this file writing section
+        # Writing the collected data to a file for my own record
+        with open("recorded_obd_data", 'a') as file:
+            file.writelines(readings)
         
         #TODO: re-enable this code
         # r = requests.post(self.url, data=readings)
         # print("Content ~> " + str(json.loads(r.content)))
         # print("Status ~> " + str(r.status_code))
         
-requested_sensors = ["rpm", "speed", "throttle_pos", "load", "fuel_status"]
+requested_sensors = [
+    "dtc_status", "fuel_status", "temp", "fuel_pressure",
+    "manifold_pressure", "rpm", "speed", "intake_air_temp",
+    "maf", "engine_time", "fuel_rail_pressure", "fuel_level",
+    "control_module_voltage", "oil_temp"]
 reporter = headless_reporter("https://vehilytics-proto-v2.herokuapp.com/readings", requested_sensors)
 reporter.connect()
 
