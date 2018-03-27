@@ -57,7 +57,7 @@ def decrypt_dtc_code(code):
   current = code
   for i in range(0,3):
     if len(current)<4:
-      raise "Tried to decode bad DTC: %s" % code
+      raise DtcException("Tried to decode bad DTC: %s" % code)
 
     tc = obd_sensors.hex_to_int(current[0]) #typecode
     tc = tc >> 2
@@ -70,7 +70,7 @@ def decrypt_dtc_code(code):
     elif tc == 3:
       type = "U"
     else:
-      raise tc
+      raise DtcException(tc)
 
     dig1 = str(obd_sensors.hex_to_int(current[0]) & 3)
     dig2 = str(obd_sensors.hex_to_int(current[1]))
@@ -340,3 +340,7 @@ class OBDPort:
 class InvalidResponseCode(Exception):
   def __init__(self, message):
     super().__init__(message)
+
+class DtcException(Exception):
+  def __init__(self, message):
+    super().__init__(str(message))
