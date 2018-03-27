@@ -179,7 +179,7 @@ class OBDPort:
 
     # 9 seems to be the length of the shortest valid response
     if len(code) < 7:
-      raise "BogusCode"
+      raise InvalidResponseCode("Bogus code returned")
 
     # get the first thing returned, echo should be off
     code = string.split(code, "\r")
@@ -336,3 +336,7 @@ class OBDPort:
         line = "%.6f,\t%s\n" % (now - start_time, data[1])
         file.write(line)
         file.flush()
+
+class InvalidResponseCode(Exception):
+  def __init__(self, message):
+    super().__init__(message)

@@ -1,7 +1,6 @@
 # Entry point for using the pyOBD tool headless
 # Based on obd_recorder from https://github.com/Pbartek/pyobd-pi/
 
-import obd_io
 import obd_sensors
 import serial
 import requests
@@ -9,11 +8,12 @@ import json
 import time
 
 from obd_utils import *
-from datetime import datetime
-
 # Passing --debug as a command line argument will
 # enable print statements otherwise they are ignored
 logger = Logger()
+
+from obd_io import *
+from datetime import datetime
 
 class headless_reporter():
   """
@@ -70,7 +70,11 @@ class headless_reporter():
 
       for index, sensor in enumerate(obd_sensors.SENSORS):
         if sensor.shortname in self.sensor_list:
-          (name, value, unit) = self.port.sensor(index)
+          try:
+            (name, value, unit) = self.port.sensor(index)
+          except InvalidResponseCode:
+            logger.log("Invalid response code returned\n\tsensor:\t%s\n" % (sensor.shortname))
+            value = "invalid"
           readings[sensor.shortname] = value
 
       self.publish_data(readings)
