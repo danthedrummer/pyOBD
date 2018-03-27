@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 ###########################################################################
 # odb_io.py
-# 
+#
 # Copyright 2004 Donour Sizemore (donour@uchicago.edu)
 # Copyright 2009 Secons Ltd. (www.obdtester.com)
 #
@@ -45,6 +45,10 @@ CLEAR_DTC_COMMAND = "04"
 GET_FREEZE_DTC_COMMAND = "07"
 
 from debugEvent import *
+
+from obd_utils import Logger
+
+logger = Logger()
 
 #__________________________________________________________________________
 def decrypt_dtc_code(code):
@@ -104,7 +108,6 @@ class OBDPort:
 
     if wx_exists:
       wx.PostEvent(self._notify_window, DebugEvent([1,"Interface successfully " + self.port.portstr + " opened"]))
-    if wx_exists:
       wx.PostEvent(self._notify_window, DebugEvent([1,"Connecting to ECU..."]))
 
     count=0
@@ -165,7 +168,7 @@ class OBDPort:
       for c in cmd:
         self.port.write(c)
       self.port.write("\r\n")
-      if wx_exists: 
+      if wx_exists:
         wx.PostEvent(self._notify_window, DebugEvent([3,"Send command:" + cmd]))
 
   def interpret_result(self,code):
@@ -173,20 +176,20 @@ class OBDPort:
     # Code will be the string returned from the device.
     # It should look something like this:
     # '41 11 0 0\r\r'
-    
+
     # 9 seems to be the length of the shortest valid response
     if len(code) < 7:
       raise "BogusCode"
-    
+
     # get the first thing returned, echo should be off
     code = string.split(code, "\r")
     code = code[0]
-    
+
     #remove whitespace
     code = string.split(code)
     code = string.join(code, "")
 
-    #cables can behave differently 
+    #cables can behave differently
     if code[:6] == "NODATA": # there is no such sensor
       return "NODATA"
 
@@ -206,11 +209,11 @@ class OBDPort:
         else:
           if buffer != "" or c != ">": #if something is in buffer, add everything
             buffer = buffer + c
-      if wx_exists: 
+      if wx_exists:
         wx.PostEvent(self._notify_window, DebugEvent([3,"Get result:" + buffer]))
       return buffer
     else:
-      if wx_exists: 
+      if wx_exists:
         wx.PostEvent(self._notify_window, DebugEvent([3,"NO self.port!" + buffer]))
     return None
 
@@ -220,7 +223,7 @@ class OBDPort:
     cmd = sensor.cmd
     self.send_command(cmd)
     data = self.get_result()
-    
+
     if data:
       data = self.interpret_result(data)
       if data != "NODATA":
@@ -246,7 +249,7 @@ class OBDPort:
 
   def get_tests_MIL(self):
     statusText=["Unsupported","Supported - Completed","Unsupported","Supported - Incompleted"]
-    
+
     statusRes = self.sensor(1)[1] #GET values
     statusTrans = [] #translate values to text
 
@@ -258,7 +261,7 @@ class OBDPort:
       statusTrans.append("On")
 
     for i in range(2,len(statusRes)): #Tests
-      statusTrans.append(statusText[int(statusRes[int(i)])]) 
+      statusTrans.append(statusText[int(statusRes[int(i)])])
 
     return statusTrans
 
@@ -275,12 +278,12 @@ class OBDPort:
     mil = r[1]
     DTCCodes = []
 
-    print "Number of stored DTC:" + str(dtcNumber) + " MIL: " + str(mil)
+    logger.log("Number of stored DTC:" + str(dtcNumber) + " MIL: " + str(mil))
     # get all DTC, 3 per mesg response
     for i in range(0, ((int(dtcNumber) + 2) / 3)):
       self.send_command(GET_DTC_COMMAND)
       res = self.get_result()
-      print "DTC result:" + res
+      logger.log("DTC result:" + res)
       for i in range(0, 3):
         val1 = hex_to_int(res[3+i*6:5+i*6])
         val2 = hex_to_int(res[6+i*6:8+i*6]) #get DTC codes from response (3 DTC each 2 bytes)
@@ -289,18 +292,18 @@ class OBDPort:
         if val==0: #skip fill of last packet
           break
 
-        DTCStr=dtcLetters[(val&0xC000)>14]+str((val&0x3000)>>12)+str(val&0x0fff) 
+        DTCStr=dtcLetters[(val&0xC000)>14]+str((val&0x3000)>>12)+str(val&0x0fff)
 
         DTCCodes.append(["Active",DTCStr])
 
     #read mode 7
     self.send_command(GET_FREEZE_DTC_COMMAND)
     res = self.get_result()
-    
+
     if res[:7] == "NO DATA": #no freeze frame
       return DTCCodes
 
-    print "DTC freeze result:" + res
+    logger.log("DTC freeze result:" + res)
     for i in range(0, 3):
       val1 = hex_to_int(res[3+i*6:5+i*6])
       val2 = hex_to_int(res[6+i*6:8+i*6]) #get DTC codes from response (3 DTC each 2 bytes)
@@ -316,13 +319,13 @@ class OBDPort:
 
   def clear_dtc(self):
     """Clears all DTCs and freeze frame data"""
-    self.send_command(CLEAR_DTC_COMMAND)     
+    self.send_command(CLEAR_DTC_COMMAND)
     r = self.get_result()
     return r
- 
-  def log(self, sensor_index, filename): 
+
+  def log(self, sensor_index, filename):
     file = open(filename, "w")
-    start_time = time.time() 
+    start_time = time.time()
     if file:
       data = self.sensor(sensor_index)
       file.write("%s     \t%s(%s)\n" % \

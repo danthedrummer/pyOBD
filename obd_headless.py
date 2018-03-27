@@ -8,9 +8,12 @@ import requests
 import json
 import time
 
-from obd_utils import scan_serial
+from obd_utils import *
 from datetime import datetime
 
+# Passing --debug as a command line argument will
+# enable print statements otherwise they are ignored
+logger = Logger()
 
 class headless_reporter():
   """
@@ -28,12 +31,12 @@ class headless_reporter():
     self.additional_params = additional_params
 
     for sensor in requested_sensors:
-      if sensor != "unknown":
+      if sensor != "unknown": # The default shortname for a sensor is "unknown" so it should be ignored
         self.add_sensor(sensor)
 
   def connect(self):
     portnames = scan_serial()
-    print(portnames) #TODO: Remove. Just here for debug
+    logger.log(portnames)
     for port in portnames:
       self.port = obd_io.OBDPort(port, None, 2, 2)
       if(self.port.State == 0):
@@ -43,7 +46,7 @@ class headless_reporter():
         break
 
     if (self.port):
-      print("Connected to " + self.port.port.name)
+      logger.log("Connected to " + self.port.port.name)
 
   def is_connected(self):
     return self.port
@@ -52,14 +55,14 @@ class headless_reporter():
     for index, e in enumerate(obd_sensors.SENSORS):
       if (sensor == e.shortname):
         self.sensor_list.append(sensor)
-        print("Reporting sensor: " + e.name)
+        logger.log("Reporting sensor: " + e.name)
         break
 
   def gather_data(self):
     if (self.port is None):
       return None
 
-    print("Gathering sensor data")
+    logger.log("Gathering sensor data")
 
     while(True):
       readings = {}
@@ -74,15 +77,14 @@ class headless_reporter():
       time.sleep(5)
 
   def publish_data(self, readings):
-    # I'm disabling the post requests until I have an endpoint to use,
-    # I will instead just be using print statements to see what's happening
+    # I'm disabling the post requests until I have an endpoint to use
     data = self.additional_params
     for key in readings:
       data[key] = readings[key]
 
-    print("Publishing Data")
-    print("Url ~> " + str(self.url))
-    print("Readings ~> " + str(data))
+    logger.log("Publishing Data")
+    logger.log("Url ~> " + str(self.url))
+    logger.log("Readings ~> " + str(data))
 
     # TODO: Remove this file writing section
     # Writing the collected data to a file for my own record
@@ -91,8 +93,8 @@ class headless_reporter():
 
     #TODO: re-enable this code
     # r = requests.post(self.url, data=readings)
-    # print("Content ~> " + str(json.loads(r.content)))
-    # print("Status ~> " + str(r.status_code))
+    # logger.log("Content ~> " + str(json.loads(r.content)))
+    # logger.log("Status ~> " + str(r.status_code))
 
 requested_sensors = [
   "fuel_level",
@@ -103,5 +105,5 @@ reporter = headless_reporter(requested_sensors,"https://vehilytics-proto-v2.hero
 reporter.connect()
 
 if not reporter.is_connected():
-  print("Not connected")
+  logger.log("Not connected")
 reporter.gather_data()

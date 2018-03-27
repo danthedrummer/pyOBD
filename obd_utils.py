@@ -1,5 +1,6 @@
 import serial
 import platform
+import sys
 
 """
 Scan for all available ports
@@ -28,3 +29,27 @@ def scan_serial():
       pass
 
   return available_ports
+
+class Logger(object):
+
+  class __Logger(object):
+
+    def __init__(self):
+      try:
+        if sys.argv[1] == "--debug":
+          self.enabled = True
+      except IndexError:
+        self.enabled = False
+
+    def __log(self, message):
+      if self.enabled:
+        print(message)
+
+  instance = None
+
+  def __init__(self):
+    if not Logger.instance:
+      Logger.instance = Logger.__Logger()
+
+  def log(self, message):
+    self.instance.__log(message)
