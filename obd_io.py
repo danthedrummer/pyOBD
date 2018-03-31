@@ -79,6 +79,10 @@ def decrypt_dtc_code(code):
     dtc.append(type+dig1+dig2+dig3+dig4)
     current = current[4:]
   return dtc
+
+def wxPostEvent(target, event):
+  if wx_exists:
+    wx.PostEvent(target, event)
 #__________________________________________________________________________
 
 class OBDPort:
@@ -95,8 +99,7 @@ class OBDPort:
     self.State = 1 #state SERIAL is 1 connected, 0 disconnected (connection failed)
 
     self._notify_window=_notify_window
-    if wx_exists:
-      wx.PostEvent(self._notify_window, DebugEvent([1,"Opening interface (serial port)"]))
+    wxPostEvent(self._notify_window, DebugEvent([1,"Opening interface (serial port)"]))
 
     try:
       self.port = serial.Serial(portnum,baud, \
@@ -106,9 +109,8 @@ class OBDPort:
       self.State = 0
       return None
 
-    if wx_exists:
-      wx.PostEvent(self._notify_window, DebugEvent([1,"Interface successfully " + self.port.portstr + " opened"]))
-      wx.PostEvent(self._notify_window, DebugEvent([1,"Connecting to ECU..."]))
+    wxPostEvent(self._notify_window, DebugEvent([1,"Interface successfully " + self.port.portstr + " opened"]))
+    wxPostEvent(self._notify_window, DebugEvent([1,"Connecting to ECU..."]))
 
     count=0
     while 1: #until error is returned try to connect
@@ -119,35 +121,28 @@ class OBDPort:
         return None
 
       self.ELMver = self.get_result()
-      if wx_exists:
-        wx.PostEvent(self._notify_window, DebugEvent([2,"atz response:" + self.ELMver]))
+      wxPostEvent(self._notify_window, DebugEvent([2,"atz response:" + self.ELMver]))
       self.send_command("ate0")  # echo off
-      if wx_exists:
-        wx.PostEvent(self._notify_window, DebugEvent([2,"ate0 response:" + self.get_result()]))
+      wxPostEvent(self._notify_window, DebugEvent([2,"ate0 response:" + self.get_result()]))
 
       self.send_command("ATSP0")
-      if wx_exists:
-        wx.PostEvent(self._notify_window, DebugEvent([2,"ATSP0 response:" + self.get_result()]))
+      wxPostEvent(self._notify_window, DebugEvent([2,"ATSP0 response:" + self.get_result()]))
 
       self.send_command("0100")
       ready = self.get_result()
-      if wx_exists:
-        wx.PostEvent(self._notify_window, DebugEvent([2,"0100 response1:" + ready]))
+      wxPostEvent(self._notify_window, DebugEvent([2,"0100 response1:" + ready]))
       if ready!="BUS ERROR":
-        if wx_exists:
-          wx.PostEvent(self._notify_window, DebugEvent([2,"0100 response2:" + ready]))
+        wxPostEvent(self._notify_window, DebugEvent([2,"0100 response2:" + ready]))
         return None
       else:
         #ready=ready[-5:] #Expecting error message: BUSINIT:.ERROR (parse last 5 chars)
-        if wx_exists:
-          wx.PostEvent(self._notify_window, DebugEvent([2,"Connection attempt failed:" + ready]))
+        wxPostEvent(self._notify_window, DebugEvent([2,"Connection attempt failed:" + ready]))
         time.sleep(5)
         if count==RECONNATTEMPTS:
           self.close()
           self.State = 0
           return None
-        if wx_exists:
-          wx.PostEvent(self._notify_window, DebugEvent([2,"Connection attempt:" + str(count)]))
+        wxPostEvent(self._notify_window, DebugEvent([2,"Connection attempt:" + str(count)]))
         count=count+1
 
   def close(self):
@@ -162,20 +157,24 @@ class OBDPort:
 
   def send_command(self, cmd):
     """Internal use only: not a public interface"""
-    if self.port:
+    if self.port is not None:
       self.port.flushOutput()
       self.port.flushInput()
-      for c in cmd:
-        self.port.write(c)
+      if type(cmd) == str:
+        self.port.write(cmd)
+      else:
+        for c in cmd:
+          self.port.write(c)
       self.port.write("\r\n")
-      if wx_exists:
-        wx.PostEvent(self._notify_window, DebugEvent([3,"Send command:" + cmd]))
+      wxPostEvent(self._notify_window, DebugEvent([3,"Send command:" + cmd]))
 
   def interpret_result(self,code):
     """Internal use only: not a public interface"""
     # Code will be the string returned from the device.
     # It should look something like this:
     # '41 11 0 0\r\r'
+
+    logger.log("Interpreting %s" % (code))
 
     # 9 seems to be the length of the shortest valid response
     if len(code) < 7:
@@ -200,7 +199,7 @@ class OBDPort:
   def get_result(self):
     """Internal use only: not a public interface"""
     time.sleep(0.1)
-    if self.port:
+    if self.port is not None:
       buffer = ""
       while 1:
         c = self.port.read(1)
@@ -209,12 +208,10 @@ class OBDPort:
         else:
           if buffer != "" or c != ">": #if something is in buffer, add everything
             buffer = buffer + c
-      if wx_exists:
-        wx.PostEvent(self._notify_window, DebugEvent([3,"Get result:" + buffer]))
+      wxPostEvent(self._notify_window, DebugEvent([3,"Get result:" + buffer]))
       return buffer
     else:
-      if wx_exists:
-        wx.PostEvent(self._notify_window, DebugEvent([3,"NO self.port!" + buffer]))
+      wxPostEvent(self._notify_window, DebugEvent([3,"NO self.port!" + buffer]))
     return None
 
   # get sensor value from command
