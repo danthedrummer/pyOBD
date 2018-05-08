@@ -51,3 +51,5 @@ fabric.properties
 
 # Cached Python files
 *.pyc
+
+headless_device_config

@@ -8,6 +8,7 @@ import json
 import time
 
 from obd_utils import *
+
 # Passing --debug as a command line argument will
 # enable print statements otherwise they are ignored
 logger = Logger()
@@ -15,7 +16,8 @@ logger = Logger()
 from obd_io import *
 from datetime import datetime
 
-class headless_reporter():
+
+class HeadlessReporter(object):
   """
   This class will handle gathering sensor data from the vehicle
   and post this data to the specified url
@@ -24,28 +26,32 @@ class headless_reporter():
   @param url: the url to receive the data
   @param additional_params: a dictionary of extra parameters that may be required
   """
-  def __init__(self, requested_sensors, url, additional_params={}):
+
+  def __init__(self, requested_sensors, url, additional_params=None):
     self.port = None
     self.sensor_list = []
     self.url = url
-    self.additional_params = additional_params
+    if additional_params is None or type(additional_params) != dict:
+      self.additional_params = {}
+    else:
+      self.additional_params = additional_params
 
     for sensor in requested_sensors:
-      if sensor != "unknown": # The default shortname for a sensor is "unknown" so it should be ignored
+      if sensor != "unknown":  # The default shortname for a sensor is "unknown" so it should be ignored
         self.add_sensor(sensor)
 
   def connect(self):
     portnames = scan_serial()
     logger.log(portnames)
     for port in portnames:
-      self.port = obd_io.OBDPort(port, None, 2, 2)
-      if(self.port.State == 0):
+      self.port = OBDPort(port, None, 2, 2)
+      if self.port.State == 0:
         self.port.close()
         self.port = None
       else:
         break
 
-    if (self.port):
+    if self.port:
       logger.log("Connected to " + self.port.port.name)
 
   def is_connected(self):
@@ -53,27 +59,26 @@ class headless_reporter():
 
   def add_sensor(self, sensor):
     for index, e in enumerate(obd_sensors.SENSORS):
-      if (sensor == e.shortname):
+      if sensor == e.shortname:
         self.sensor_list.append(sensor)
         logger.log("Reporting sensor: " + e.name)
         break
 
   def gather_data(self):
-    if (self.port is None):
+    if self.port is None:
       return None
 
     logger.log("Gathering sensor data")
 
-    while(True):
-      readings = {}
-      readings["readings_taken_at"] = datetime.now()
+    while True:
+      readings = {"readings_taken_at": datetime.now()}
 
       for index, sensor in enumerate(obd_sensors.SENSORS):
         if sensor.shortname in self.sensor_list:
           try:
             (name, value, unit) = self.port.sensor(index)
           except InvalidResponseCode:
-            logger.log("Invalid response code returned\n\tsensor:\t%s\n" % (sensor.shortname))
+            logger.log("Invalid response code returned\n\tsensor:\t%s\n" % sensor.shortname)
             value = "invalid"
           readings[sensor.shortname] = value
 
@@ -95,17 +100,18 @@ class headless_reporter():
     with open("recorded_obd_data", 'a') as file:
       file.write(json.dumps(data, default=str) + "\n")
 
-    #TODO: re-enable this code
+    # TODO: re-enable this code
     # r = requests.post(self.url, data=readings)
     # logger.log("Content ~> " + str(json.loads(r.content)))
     # logger.log("Status ~> " + str(r.status_code))
+
 
 requested_sensors = [
   "fuel_level",
   "control_module_voltage",
   "ambient_air_temp"
 ]
-reporter = headless_reporter(requested_sensors,"https://vehilytics-proto-v2.herokuapp.com/readings")
+reporter = HeadlessReporter(requested_sensors, "https://vehilytics-proto-v2.herokuapp.com/readings")
 reporter.connect()
 
 if not reporter.is_connected():
