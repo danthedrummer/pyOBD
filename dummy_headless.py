@@ -7,6 +7,7 @@ import time
 from obd_utils import Logger
 from datetime import datetime
 from obd_data_generator import ObdDataGenerator
+from threading import Thread
 
 logger = Logger()
 system_active = True
@@ -23,7 +24,8 @@ class DummyHeadless(object):
     self.root_url = root_url
     self.email = device_email
     self.password = device_password
-    self.headers = {}
+    self.device_name = ""
+    self.headers = {'Content-Type': 'application/json'}
     if additional_params is None or type(additional_params) != dict:
       self.additional_params = {}
     else:
@@ -31,30 +33,28 @@ class DummyHeadless(object):
 
   def device_login(self):
     payload = {'email': self.email, 'password': self.password}
-    print("payload = %s" % payload)
     r = requests.post("%sv1/device_sessions" % self.root_url, data=payload)
     content = json.loads(r.content)
-    print(content)
+    self.device_name = content['device_name']
     self.headers['X-Device-Email'] = self.email
     self.headers['X-Device-Token'] = content['authentication_token']
 
   def get_requested_sensors(self):
     r = requests.get("%sv1/sensors" % self.root_url, headers=self.headers)
-    # print(r.status_code)
     self.sensor_list = json.loads(r.content)
-    # for sensor in self.sensor_list:
-    #   print(sensor['name'])
 
   def run(self):
     self.device_login()
     generator = ObdDataGenerator()
     while system_active:
       self.get_requested_sensors()
+      report = {"time_reported": str(datetime.now()), "device_name": self.device_name, "readings": []}
       for sensor in self.sensor_list:
-        generator.generate(sensor['shortname'])
-      print("----------------------------------")
-      time.sleep(3)
-      ...
+        value = generator.generate(sensor['shortname'])
+        report['readings'].append({"shortname": sensor["shortname"], "value": str(value)})
+      r = requests.post("%sv1/reports" % self.root_url, headers=self.headers, data=json.dumps(report))
+      print(r.content)
+      time.sleep(10)
 
 
 try:
@@ -63,7 +63,7 @@ try:
     email = config_file.readline().strip()
     password = config_file.readline().strip()
   reporter = DummyHeadless(url, email, password)
-  reporter.run()
+  Thread(target=reporter.run).start()
   while system_active:
     pass
 except KeyboardInterrupt:
