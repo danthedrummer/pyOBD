@@ -6,6 +6,7 @@ import time
 
 from obd_utils import Logger
 from datetime import datetime
+from obd_data_generator import ObdDataGenerator
 
 logger = Logger()
 system_active = True
@@ -30,22 +31,29 @@ class DummyHeadless(object):
 
   def device_login(self):
     payload = {'email': self.email, 'password': self.password}
+    print("payload = %s" % payload)
     r = requests.post("%sv1/device_sessions" % self.root_url, data=payload)
     content = json.loads(r.content)
     print(content)
     self.headers['X-Device-Email'] = self.email
     self.headers['X-Device-Token'] = content['authentication_token']
-    self.get_requested_sensors()
 
   def get_requested_sensors(self):
     r = requests.get("%sv1/sensors" % self.root_url, headers=self.headers)
-    print(r.status_code)
+    # print(r.status_code)
     self.sensor_list = json.loads(r.content)
-    print(self.sensor_list)
+    # for sensor in self.sensor_list:
+    #   print(sensor['name'])
 
   def run(self):
     self.device_login()
+    generator = ObdDataGenerator()
     while system_active:
+      self.get_requested_sensors()
+      for sensor in self.sensor_list:
+        generator.generate(sensor['shortname'])
+      print("----------------------------------")
+      time.sleep(3)
       ...
 
 
@@ -56,10 +64,10 @@ try:
     password = config_file.readline().strip()
   reporter = DummyHeadless(url, email, password)
   reporter.run()
-  while True:
+  while system_active:
     pass
 except KeyboardInterrupt:
-  logger.log("Shutting down...")
+  print("Shutting down...")
 finally:
   system_active = False
   sys.exit(0)
