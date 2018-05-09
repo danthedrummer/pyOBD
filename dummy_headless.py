@@ -106,9 +106,8 @@ try:
     password = config_file.readline().strip()
   reporter = DummyHeadless(url, email, password)
   Thread(target=reporter.run).start()
-  # while system_active:
-  #   pass
-  time.sleep(6)
+  while system_active:
+    pass
 except KeyboardInterrupt:
   logger.log("Shutting down...")
 finally:
