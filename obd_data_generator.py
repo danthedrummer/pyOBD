@@ -44,7 +44,29 @@ class ObdDataGenerator(object):
 
     :return: The randomly generated value
     """
-    ...
+    try:
+      rpm_data = self.rpm_data
+      rpm_up = self.rpm_up
+    except AttributeError:
+      rpm_data = random.randint(0, 4000)
+      rpm_up = True
+
+    if rpm_up and rpm_data < 7000:
+      rpm_data += random.randint(50, 300)
+    elif not rpm_up and rpm_data > 500:
+      rpm_data -= random.randint(50, 300)
+
+    if rpm_data > 7000:
+      rpm_up = False
+    elif rpm_data < 500:
+      rpm_up = True
+      if rpm_data < 0:
+        rpm_data = 0
+
+    self.rpm_up = rpm_up
+    self.rpm_data = rpm_data
+    return rpm_data
+
 
   def speed(self):
     """
@@ -52,7 +74,28 @@ class ObdDataGenerator(object):
 
     :return: The randomly generated value
     """
-    ...
+    try:
+      speed_data = self.speed_data
+      speed_up = self.speed_up
+    except AttributeError:
+      speed_data = random.randint(0, 60)
+      speed_up = True
+
+    if speed_up and speed_data < 100:
+      speed_data += random.randint(2, 10)
+    elif not speed_up and speed_data > 0:
+      speed_data -= random.randint(2, 10)
+      if speed_data < 0:
+        speed_data = 0
+
+    if speed_data > 100:
+      speed_up = False
+    elif speed_data == 0:
+      speed_up = True
+
+    self.speed_up = speed_up
+    self.speed_data = speed_data
+    return speed_data
 
   def intake_air_temp(self):
     """
@@ -60,7 +103,7 @@ class ObdDataGenerator(object):
 
     :return: The randomly generated value
     """
-    ...
+    return random.randint(-7, 30)
 
   def maf(self):
     """
@@ -68,7 +111,15 @@ class ObdDataGenerator(object):
 
     :return: The randomly generated value
     """
-    ...
+    try:
+      flow_rate = self.flow_rate
+    except AttributeError:
+      self.flow_rate = random.randint(1000, 1500)
+      flow_rate = self.flow_rate
+
+    flow_rate = flow_rate - random.randint(-100, 100)
+
+    return flow_rate
 
   def fuel_level(self):
     """
@@ -117,4 +168,14 @@ class ObdDataGenerator(object):
     Generates engine oil temperature data. Safe limits between 30 and 130 degrees Celsius
     :return:
     """
-    ...
+    try:
+      oil_temp_data = self.oil_temp_data
+    except AttributeError:
+      oil_temp_data = random.randint(30, 40)
+
+    if oil_temp_data > 100 and random.uniform(0, 1) > 0.8:
+      oil_temp_data = random.randint(28, 40)
+    else:
+      oil_temp_data += random.randint(-2, 10)
+    self.oil_temp_data = oil_temp_data
+    return oil_temp_data
