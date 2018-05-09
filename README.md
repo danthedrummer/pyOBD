@@ -1,5 +1,11 @@
-pyOBD_headless
+Vehilytics OBD Reporter
 =====
+
+## Description
+This system forms a part of my final year project and is coded to work specifically with
+my own API, so may not be appropriate for general use.
+
+### pyOBD_headless
 Building on to the pyOBD tool to allow it to be used headless.
 
 Fork from https://github.com/chethenry/pyOBD, which is a fork from http://www.obdtester.com/pyobd.
