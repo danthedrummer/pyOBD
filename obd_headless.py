@@ -1,46 +1,45 @@
 # Entry point for using the pyOBD tool headless
 # Based on obd_recorder from https://github.com/Pbartek/pyobd-pi/
 
-import obd_sensors
-import serial
 import requests
 import json
-import time
 
 from obd_utils import *
+from obd_io import *
+from datetime import datetime
+from threading import Thread
 
 # Passing --debug as a command line argument will
 # enable print statements otherwise they are ignored
 logger = Logger()
-
-from obd_io import *
-from datetime import datetime
+system_active = True
 
 
 class HeadlessReporter(object):
-  """
-  This class will handle gathering sensor data from the vehicle
-  and post this data to the specified url
 
-  @param requested_sensors: a list of sensors to be polled
-  @param url: the url to receive the data
-  @param additional_params: a dictionary of extra parameters that may be required
-  """
+  def __init__(self, root_url, device_email, device_password, delay=3):
+    """
+    This class will handle gathering sensor data from the vehicle
+    and post this data to the specified url
 
-  def __init__(self, requested_sensors, url, additional_params=None):
+    :param root_url: The root url of the api to be used
+    :param device_email: The email of the current device
+    :param device_password: The password for the current device
+    :param delay: How often the device should publish data
+    """
     self.port = None
     self.sensor_list = []
-    self.url = url
-    if additional_params is None or type(additional_params) != dict:
-      self.additional_params = {}
-    else:
-      self.additional_params = additional_params
-
-    for sensor in requested_sensors:
-      if sensor != "unknown":  # The default shortname for a sensor is "unknown" so it should be ignored
-        self.add_sensor(sensor)
+    self.root_url = root_url
+    self.email = device_email
+    self.password = device_password
+    self.device_name = ""
+    self.headers = {'Content-Type': 'application/json'}
+    self.delay = delay
 
   def connect(self):
+    """
+    Connect to the OBD reader
+    """
     portnames = scan_serial()
     logger.log(portnames)
     for port in portnames:
@@ -57,63 +56,99 @@ class HeadlessReporter(object):
   def is_connected(self):
     return self.port
 
-  def add_sensor(self, sensor):
-    for index, e in enumerate(obd_sensors.SENSORS):
-      if sensor == e.shortname:
-        self.sensor_list.append(sensor)
-        logger.log("Reporting sensor: " + e.name)
-        break
+  def device_login(self):
+    """
+    Requests an authentication token from the api and sets a reusable headers attribute
+    """
+    payload = {'email': self.email, 'password': self.password}
+    r = requests.post("%sv1/device_sessions" % self.root_url, data=payload)
+    content = json.loads(r.content)
+    self.device_name = content['device_name']
+    self.headers['X-Device-Email'] = self.email
+    self.headers['X-Device-Token'] = content['authentication_token']
 
-  def gather_data(self):
+  def device_logout(self):
+    """
+    Logs out the device, resetting the authentication token
+    """
+    r = requests.delete("%sv1/device_sessions" % self.root_url, headers=self.headers)
+    if r.status_code == 200:
+      logger.log("Successfully logged out")
+    else:
+      logger.log("Problem logging out")
+
+  def get_requested_sensors(self):
+    """
+    Requests all of the sensors requested by the owner of the device
+    :return: The list of requested sensors
+    """
+    r = requests.get("%sv1/sensors" % self.root_url, headers=self.headers)
+    return json.loads(r.content)
+
+  def create_report(self):
+    """
+    Generates a report with a timestamp, device name, and a list of sensor readings
+    :return: The created report
+    """
+    report = {"time_reported": str(datetime.now()), "device_name": self.device_name, "readings": []}
+    for sensor in self.sensor_list:
+      value = self.get_data_for_sensor(sensor)
+      if value is not None:
+        report['readings'].append({"shortname": sensor["shortname"], "value": str(value)})
+    return report
+
+  def publish_report(self, report):
+    """
+    Publishes a report to the web service
+    :param report: The report to be published
+    """
+    r = requests.post("%sv1/reports" % self.root_url, headers=self.headers, data=json.dumps(report))
+    logger.log(r.content)
+
+  def get_data_for_sensor(self, requested_sensor):
+    """
+    Retrieves the value for the specified sensor
+    :param requested_sensor: The requested sensor
+    :return: The current measured value for that sensor, or None if there was an issue
+    """
     if self.port is None:
       return None
+    for index, sensor in enumerate(obd_sensors.SENSORS):
+      if sensor.shortname == requested_sensor["shortname"]:
+        try:
+          (name, value, unit) = self.port.sensor(index)
+          return value
+        except InvalidResponseCode:
+          logger.log("Invalid response code returned\n\tsensor:\t%s\n" % sensor.shortname)
+          return None
 
-    logger.log("Gathering sensor data")
-
-    while True:
-      readings = {"readings_taken_at": datetime.now()}
-
-      for index, sensor in enumerate(obd_sensors.SENSORS):
-        if sensor.shortname in self.sensor_list:
-          try:
-            (name, value, unit) = self.port.sensor(index)
-          except InvalidResponseCode:
-            logger.log("Invalid response code returned\n\tsensor:\t%s\n" % sensor.shortname)
-            value = "invalid"
-          readings[sensor.shortname] = value
-
-      self.publish_data(readings)
-      time.sleep(5)
-
-  def publish_data(self, readings):
-    # I'm disabling the post requests until I have an endpoint to use
-    data = self.additional_params
-    for key in readings:
-      data[key] = readings[key]
-
-    logger.log("Publishing Data")
-    logger.log("Url ~> " + str(self.url))
-    logger.log("Readings ~> " + str(data))
-
-    # TODO: Remove this file writing section
-    # Writing the collected data to a file for my own record
-    with open("recorded_obd_data", 'a') as file:
-      file.write(json.dumps(data, default=str) + "\n")
-
-    # TODO: re-enable this code
-    # r = requests.post(self.url, data=readings)
-    # logger.log("Content ~> " + str(json.loads(r.content)))
-    # logger.log("Status ~> " + str(r.status_code))
+  def run(self):
+    self.device_login()
+    while not self.is_connected():
+      self.connect()
+    while system_active:
+      self.sensor_list = self.get_requested_sensors()
+      report = self.create_report()
+      self.publish_report(report)
+      x = 0
+      while x <= 100 and system_active:
+        time.sleep(self.delay/100)
+        x += 1
+    self.device_logout()
 
 
-requested_sensors = [
-  "fuel_level",
-  "control_module_voltage",
-  "ambient_air_temp"
-]
-reporter = HeadlessReporter(requested_sensors, "https://vehilytics-proto-v2.herokuapp.com/readings")
-reporter.connect()
-
-if not reporter.is_connected():
-  logger.log("Not connected")
-reporter.gather_data()
+try:
+  with open('headless_device_config', 'r') as config_file:
+    url = config_file.readline().strip()
+    email = config_file.readline().strip()
+    password = config_file.readline().strip()
+  reporter = HeadlessReporter(url, email, password)
+  Thread(target=reporter.run).start()
+  while system_active:
+    pass
+except KeyboardInterrupt:
+  logger.log("Shutting down...")
+finally:
+  logger.log("Cleaning up...")
+  system_active = False
+  sys.exit(0)

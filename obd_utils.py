@@ -36,7 +36,7 @@ class Logger(object):
 
     def __init__(self):
       try:
-        if sys.argv[1] == "--debug":
+        if "--debug" in sys.argv:
           self.enabled = True
       except IndexError:
         self.enabled = False
