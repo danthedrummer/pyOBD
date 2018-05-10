@@ -402,7 +402,7 @@ class MyApp(wx.App):
     self.OBDTests.InsertColumn(1, "Value")
     self.nb.AddPage(self.OBDTests, "Tests")
 
-    for i in range(0,len(ptest)): #fill MODE 1 PID 1 test description
+    for i in range(0,len(ptest)): #fill MODE 1 PID 1 tests description
       self.OBDTests.Append([ptest[i],"---"]);
 
     self.build_sensor_page()

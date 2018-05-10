@@ -1,28 +1,26 @@
 import requests
 import json
-import time
+import datetime
 
-from obd_utils import Logger
-from datetime import datetime
-from obd_data_generator import ObdDataGenerator
+from obd_utils import *
+from obd_io import *
 
 logger = Logger()
 system_active = True
 
-class DummyHeadless(object):
+class HeadlessReporter(object):
 
   def __init__(self, root_url, device_email, device_password, delay=3):
     """
-    This class will act as a dummy reporter for OBD data for the purpose of
-    showcasing the project where I will not have access to a car with an
-    OBD port. It will behave in the exact same way that the regular headless
-    reported will but will generate fake data instead of accessing the OBD.
+    This class will handle gathering sensor data from the vehicle
+    and post this data to the specified url
 
     :param root_url: The root url of the api to be used
     :param device_email: The email of the current device
     :param device_password: The password for the current device
     :param delay: How often the device should publish data
     """
+    self.port = None
     self.sensor_list = []
     self.root_url = root_url
     self.email = device_email
@@ -30,7 +28,26 @@ class DummyHeadless(object):
     self.device_name = ""
     self.headers = {'Content-Type': 'application/json'}
     self.delay = delay
-    self.generator = ObdDataGenerator()
+
+  def connect(self):
+    """
+    Connect to the OBD reader
+    """
+    portnames = scan_serial()
+    logger.log(portnames)
+    for port in portnames:
+      self.port = OBDPort(port, None, 2, 2)
+      if self.port.State == 0:
+        self.port.close()
+        self.port = None
+      else:
+        break
+
+    if self.port:
+      logger.log("Connected to " + self.port.port.name)
+
+  def is_connected(self):
+    return self.port
 
   def device_login(self):
     """
@@ -59,14 +76,18 @@ class DummyHeadless(object):
     :return: The list of requested sensors
     """
     r = requests.get("%sv1/sensors" % self.root_url, headers=self.headers)
-    print(r.content)
     return json.loads(r.content)
 
   def create_report(self):
-    report = {"time_reported": str(datetime.now()), "device_name": self.device_name, "readings": []}
+    """
+    Generates a report with a timestamp, device name, and a list of sensor readings
+    :return: The created report
+    """
+    report = {"time_reported": str(datetime.datetime.now()), "device_name": self.device_name, "readings": []}
     for sensor in self.sensor_list:
       value = self.get_data_for_sensor(sensor)
-      report['readings'].append({"shortname": sensor["shortname"], "value": str(value)})
+      if value is not None:
+        report['readings'].append({"shortname": sensor["shortname"], "value": str(value)})
     return report
 
   def publish_report(self, report):
@@ -79,14 +100,25 @@ class DummyHeadless(object):
 
   def get_data_for_sensor(self, requested_sensor):
     """
-    Generates a value for the specified sensor
+    Retrieves the value for the specified sensor
     :param requested_sensor: The requested sensor
-    :return: The generated value for that sensor
+    :return: The current measured value for that sensor, or None if there was an issue
     """
-    return self.generator.generate(requested_sensor["shortname"])
+    if self.port is None:
+      return None
+    for index, sensor in enumerate(obd_sensors.SENSORS):
+      if sensor.shortname == requested_sensor["shortname"]:
+        try:
+          (name, value, unit) = self.port.sensor(index)
+          return value
+        except InvalidResponseCode:
+          logger.log("Invalid response code returned\n\tsensor:\t%s\n" % sensor.shortname)
+          return None
 
   def run(self):
     self.device_login()
+    while not self.is_connected():
+      self.connect()
     while system_active:
       self.sensor_list = self.get_requested_sensors()
       report = self.create_report()

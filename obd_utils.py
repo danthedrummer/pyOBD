@@ -10,7 +10,7 @@ Scan for all available ports
 def scan_serial():
   available_ports = []
 
-  #Bluetooth
+  # Bluetooth
   for i in range(10):
     try:
       s = serial.Serial("/dev/rfcomm"+str(i))
@@ -19,7 +19,7 @@ def scan_serial():
     except serial.SerialException:
       pass
 
-  #USB
+  # USB
   for i in range(256):
     try:
       s = serial.Serial("/dev/ttyUSB"+str(i))
