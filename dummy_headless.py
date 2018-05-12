@@ -11,7 +11,7 @@ system_active = True
 
 class DummyHeadless(object):
 
-  def __init__(self, root_url, device_email, device_password, delay=3):
+  def __init__(self, root_url, device_email, device_password, delay=10):
     """
     This class will act as a dummy reporter for OBD data for the purpose of
     showcasing the project where I will not have access to a car with an
@@ -59,7 +59,6 @@ class DummyHeadless(object):
     :return: The list of requested sensors
     """
     r = requests.get("%sv1/sensors" % self.root_url, headers=self.headers)
-    print(r.content)
     return json.loads(r.content)
 
   def create_report(self):

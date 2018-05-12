@@ -88,7 +88,7 @@ class ObdDataGenerator(object):
       if speed_data < 0:
         speed_data = 0
 
-    if speed_data > 100:
+    if speed_data >= 100:
       speed_up = False
     elif speed_data == 0:
       speed_up = True

@@ -10,7 +10,7 @@ system_active = True
 
 class HeadlessReporter(object):
 
-  def __init__(self, root_url, device_email, device_password, delay=3):
+  def __init__(self, root_url, device_email, device_password, delay=10):
     """
     This class will handle gathering sensor data from the vehicle
     and post this data to the specified url
